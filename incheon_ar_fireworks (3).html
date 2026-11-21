@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>인천과학대제전 불꽃축제</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Noto+Serif+KR:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#020208;
+    --navy-mid:#0d1b3d;
+    --ink:#04060f;
+    --paper:#f4f1ea;
+    --gold:#c9a86a;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--ink); overflow:hidden;
+    font-family:'Noto Serif KR', serif;
+  }
+  #stage{
+    position:fixed; inset:0; width:100%; height:100%;
+  }
+  video#cam{
+    display:none;
+  }
+  canvas#scene{
+    position:absolute; inset:0; width:100%; height:100%;
+    display:block;
+  }
+
+  /* ---------- Start Screen ---------- */
+  #startScreen{
+    position:fixed; inset:0; z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, var(--navy-mid) 0%, var(--navy-deep) 62%, var(--ink) 100%);
+    transition: opacity 1.2s ease;
+  }
+  #startScreen.fade-out{
+    opacity:0; pointer-events:none;
+  }
+  .start-inner{
+    text-align:center;
+    color:var(--paper);
+    padding:2rem;
+    max-width:640px;
+  }
+  .start-eyebrow{
+    font-family:'Playfair Display', 'Noto Serif KR', serif;
+    font-style:italic;
+    font-weight:400;
+    font-size:0.95rem;
+    color:var(--gold);
+    letter-spacing:0.04em;
+    margin:0 0 0.6rem 0;
+  }
+  .start-title{
+    font-family:'Playfair Display', 'Noto Serif KR', serif;
+    font-weight:600;
+    font-size:clamp(1.8rem, 5vw, 3.2rem);
+    margin:0 0 1rem 0;
+    white-space:nowrap;
+    letter-spacing:0.01em;
+    text-shadow:0 0 40px rgba(180,200,255,0.25);
+  }
+  .start-desc{
+    font-size:clamp(0.85rem, 1.6vw, 1.05rem);
+    line-height:1.9;
+    color:rgba(244,241,234,0.75);
+    margin:0 0 2.4rem 0;
+    font-weight:300;
+  }
+  #startBtn{
+    font-family:'Noto Serif KR', serif;
+    font-size:1rem;
+    font-weight:500;
+    letter-spacing:0.03em;
+    color:var(--ink);
+    background:linear-gradient(180deg, #eae3d2, var(--gold));
+    border:none;
+    padding:0.95rem 2.6rem;
+    border-radius:2px;
+    cursor:pointer;
+    transition:transform 0.25s ease, box-shadow 0.25s ease;
+    box-shadow:0 10px 30px rgba(201,168,106,0.25);
+  }
+  #startBtn:hover{ transform:translateY(-2px); box-shadow:0 14px 38px rgba(201,168,106,0.35); }
+  #startBtn:disabled{ opacity:0.55; cursor:progress; transform:none; }
+  .start-note{
+    margin-top:1.4rem;
+    font-size:0.75rem;
+    color:rgba(244,241,234,0.4);
+    font-weight:300;
+    letter-spacing:0.02em;
+  }
+
+  /* ---------- Overlay UI ---------- */
+  #titleBar{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:center;
+    padding-top:2.2vh;
+    pointer-events:none;
+    z-index:10;
+  }
+  #titleBar h1{
+    font-family:'Playfair Display', 'Noto Serif KR', serif;
+    font-weight:600;
+    font-style:normal;
+    color:#f4f1ea;
+    white-space:nowrap;
+    font-size:clamp(1.1rem, 3.4vw, 2.4rem);
+    margin:0;
+    letter-spacing:0.02em;
+    text-shadow:0 0 24px rgba(120,150,255,0.4), 0 2px 12px rgba(0,0,0,0.6);
+  }
+  #watermark{
+    position:absolute; bottom:1.6vh; right:1.6vw;
+    z-index:10;
+    font-family:'Playfair Display', 'Noto Serif KR', serif;
+    font-weight:400;
+    font-style:italic;
+    font-size:clamp(0.65rem, 1.2vw, 0.95rem);
+    color:rgba(244,241,234,0.55);
+    letter-spacing:0.03em;
+    pointer-events:none;
+    text-shadow:0 1px 6px rgba(0,0,0,0.6);
+  }
+  #handStatus{
+    position:absolute; top:1.6vh; left:1.6vw; z-index:10;
+    font-family:'Noto Serif KR', serif;
+    font-size:0.72rem;
+    font-weight:300;
+    letter-spacing:0.03em;
+    color:rgba(244,241,234,0.45);
+    pointer-events:none;
+  }
+  #handStatus span{ color:var(--gold); }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <video id="cam" playsinline></video>
+  <canvas id="scene"></canvas>
+  <div id="titleBar"><h1>인천과학대제전 불꽃축제</h1></div>
+  <div id="watermark">인공지능창작교실</div>
+  <div id="handStatus">손 인식 대기 중<span id="handDot">…</span></div>
+</div>
+
+<div id="startScreen">
+  <div class="start-inner">
+    <p class="start-eyebrow">Incheon Science Festival — AR Installation</p>
+    <h2 class="start-title">인천과학대제전 불꽃축제</h2>
+    <p class="start-desc">
+      웹캠 앞에서 손을 들어 밤하늘에 떠오른 구체를 향해 손끝을 가져가 보세요.<br>
+      구체가 터지며 도심 야경 위로 화려한 불꽃이 펼쳐집니다.
+    </p>
+    <button id="startBtn">카메라로 시작하기</button>
+    <p class="start-note">카메라 권한 허용이 필요합니다 · 소리를 켜주세요</p>
+  </div>
+</div>
+
+<!-- MediaPipe Hands -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<!-- Tone.js -->
+<script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js" crossorigin="anonymous"></script>
+
+<script>
+(function(){
+  "use strict";
+
+  const video = document.getElementById('cam');
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const startScreen = document.getElementById('startScreen');
+  const startBtn = document.getElementById('startBtn');
+  const handDot = document.getElementById('handDot');
+
+  let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize(){
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    buildSkyline();
+    layoutOrbs();
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------------------------------------------------------------
+  // Orb palette — cool gallery jewel tones
+  // ---------------------------------------------------------------
+  const PALETTE = [
+    {core:'#bfe3ff', rim:'#4fa8ff', name:'sapphire'},
+    {core:'#e9c9ff', rim:'#a464ff', name:'amethyst'},
+    {core:'#c8ffe9', rim:'#3fe0a8', name:'emerald'},
+    {core:'#ffe0c9', rim:'#ff9a5a', name:'rosegold'},
+    {core:'#c9f5ff', rim:'#4fd8ff', name:'aqua'},
+    {core:'#fff3c4', rim:'#ffcf4f', name:'citrine'},
+    {core:'#ffd0d8', rim:'#ff5a7a', name:'ruby'},
+    {core:'#e6e9f5', rim:'#a6b0d6', name:'silver'}
+  ];
+
+  const ORB_COUNT = 8;
+  const orbs = [];
+  const SKYLINE_FRAC = 0.44; // bottom portion of screen reserved for the city silhouette
+
+  function layoutOrbs(){
+    const cx = W/2;
+    const cy = H * (1 - SKYLINE_FRAC) * 0.52; // float within the open night sky
+    const spread = Math.min(W*0.86, 1600);
+    const stepX = spread / (ORB_COUNT - 1);
+    const startX = cx - spread/2;
+    const amp = Math.min(H*0.07, 60);
+
+    for(let i=0;i<ORB_COUNT;i++){
+      const zig = (i % 2 === 0) ? -amp : amp;
+      const baseX = startX + stepX*i;
+      const baseY = cy + zig;
+      if(orbs[i]){
+        orbs[i].baseX = baseX; orbs[i].baseY = baseY;
+      } else {
+        orbs[i] = {
+          baseX, baseY,
+          radius: Math.min(W,H)*0.065 + 12,
+          phase: Math.random()*Math.PI*2,
+          floatSpeed: 0.6 + Math.random()*0.3,
+          rotation: Math.random()*Math.PI*2,
+          color: PALETTE[i % PALETTE.length],
+          alive: true,
+          respawnAt: 0,
+          scale: 1
+        };
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Particle system — Enhanced Stardust (spokes + streaks + glitter + embers)
+  // ---------------------------------------------------------------
+  const GRAVITY = 0.15;
+  const DRAG = 0.88;
+  const MAX_PARTICLES = 750;
+  let particles = [];
+
+  // Curated firework color accents so each shell can mix hues,
+  // the way real multi-break fireworks show two or three colors at once.
+  const FIREWORK_ACCENTS = [
+    {core:'#fff2d6', rim:'#ffcf4d'}, // warm gold
+    {core:'#ffd9e6', rim:'#ff5f96'}, // rose pink
+    {core:'#dceeff', rim:'#5fb3ff'}, // sky blue
+    {core:'#ffffff', rim:'#f2f2f2'}, // pure white
+    {core:'#efe0ff', rim:'#b478ff'}  // violet
+  ];
+
+  function burstParticles(x, y, color, scale){
+    scale = scale || 1;
+    const accent = FIREWORK_ACCENTS[Math.floor(Math.random()*FIREWORK_ACCENTS.length)];
+
+    // radiating spokes — the long straight arms that define a chrysanthemum shell
+    const spokeCount = Math.floor((16 + Math.random()*6) * Math.min(scale,1.3));
+    for(let i=0;i<spokeCount;i++){
+      const angle = (i/spokeCount)*Math.PI*2 + (Math.random()-0.5)*0.18;
+      const speed = (7 + Math.random()*5.5) * scale;
+      const useAccent = i % 2 === 0;
+      particles.push({
+        type:'spoke',
+        x, y, px:x, py:y,
+        vx: Math.cos(angle)*speed,
+        vy: Math.sin(angle)*speed,
+        life: 1,
+        decay: 0.016 + Math.random()*0.009,
+        size: (1.3 + Math.random()*1.1) * scale,
+        color: useAccent ? accent.rim : color.rim,
+        trail: [],
+        maxTrail: 4
+      });
+    }
+
+    // dense inner shell — fast random streaking sparks with short trails
+    const count = Math.floor((85 + Math.random()*45) * scale);
+    for(let i=0;i<count;i++){
+      const angle = Math.random()*Math.PI*2;
+      const speed = (2.5 + Math.random()*6) * scale;
+      const isCore = Math.random() < 0.6;
+      particles.push({
+        type:'streak',
+        x, y, px:x, py:y,
+        vx: Math.cos(angle)*speed,
+        vy: Math.sin(angle)*speed - (1.2*scale),
+        life: 1,
+        decay: 0.02 + Math.random()*0.026,
+        size: (0.8 + Math.random()*1.6) * scale,
+        color: isCore ? color.rim : accent.core,
+        twinklePhase: Math.random()*Math.PI*2
+      });
+    }
+
+    // slower drifting glitter — lingers and twinkles like falling stardust
+    const glitterCount = Math.floor(42 * scale);
+    for(let i=0;i<glitterCount;i++){
+      const angle = Math.random()*Math.PI*2;
+      const speed = (0.6 + Math.random()*2.6) * scale;
+      particles.push({
+        type:'glitter',
+        x, y, px:x, py:y,
+        vx: Math.cos(angle)*speed,
+        vy: Math.sin(angle)*speed - 0.6,
+        life: 1,
+        decay: 0.009 + Math.random()*0.013,
+        size: (0.8 + Math.random()*1.4) * scale,
+        color: Math.random() < 0.5 ? '#ffffff' : accent.core,
+        twinklePhase: Math.random()*Math.PI*2
+      });
+    }
+
+    // hot core embers — bright white-hot center that cools to color
+    const emberCount = Math.floor(14 * scale);
+    for(let i=0;i<emberCount;i++){
+      const angle = Math.random()*Math.PI*2;
+      const speed = (1 + Math.random()*3) * scale;
+      particles.push({
+        type:'ember',
+        x, y, px:x, py:y,
+        vx: Math.cos(angle)*speed,
+        vy: Math.sin(angle)*speed,
+        life: 1,
+        decay: 0.026 + Math.random()*0.03,
+        size: (1.8 + Math.random()*2.2) * scale,
+        color: color.rim,
+        twinklePhase: 0
+      });
+    }
+
+    if(particles.length > MAX_PARTICLES){
+      particles.splice(0, particles.length - MAX_PARTICLES);
+    }
+  }
+
+  function updateParticles(t){
+    for(let i=particles.length-1;i>=0;i--){
+      const p = particles[i];
+      p.px = p.x; p.py = p.y;
+      const g = p.type === 'glitter' ? GRAVITY*0.35 : (p.type === 'spoke' ? GRAVITY*0.7 : GRAVITY);
+      const d = p.type === 'glitter' ? 0.96 : (p.type === 'spoke' ? 0.975 : DRAG);
+      p.vy += g;
+      p.vx *= d;
+      p.vy *= d;
+      p.x += p.vx;
+      p.y += p.vy;
+      if(p.type === 'spoke'){
+        p.trail.push({x:p.x, y:p.y});
+        if(p.trail.length > p.maxTrail) p.trail.shift();
+      }
+      p.life -= p.decay;
+      if(p.life <= 0) particles.splice(i,1);
+    }
+  }
+
+  function drawParticles(t){
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const heavyLoad = particles.length > 450; // adaptive: cut trail cost under heavy load
+    for(const p of particles){
+      const alpha = Math.max(p.life, 0);
+      if(p.type === 'spoke'){
+        if(heavyLoad || p.trail.length < 2){
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = p.size;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p.px, p.py);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        } else {
+          const trail = p.trail;
+          for(let k=1;k<trail.length;k++){
+            const segAlpha = alpha * (k/trail.length) * 0.9;
+            ctx.globalAlpha = segAlpha;
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = p.size * (k/trail.length);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(trail[k-1].x, trail[k-1].y);
+            ctx.lineTo(trail[k].x, trail[k].y);
+            ctx.stroke();
+          }
+        }
+        // bright tip
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size*0.6, 0, Math.PI*2);
+        ctx.fill();
+      } else if(p.type === 'streak'){
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.size;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.px, p.py);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      } else if(p.type === 'ember'){
+        const hot = Math.min(1, p.life*1.6);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = hot > 0.5 ? '#ffffff' : p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+      } else { // glitter
+        const tw = 0.5 + 0.5*Math.sin(t*0.02 + p.twinklePhase);
+        ctx.globalAlpha = alpha * (0.4 + tw*0.6);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------
+  // Screen flash + expanding shockwave ring
+  // ---------------------------------------------------------------
+  let flashes = [];
+  let shockwaves = [];
+  function addFlash(x,y,color,scale){
+    flashes.push({x,y,life:1,color,scale:scale||1});
+    shockwaves.push({x,y,life:1,color,scale:scale||1});
+  }
+  function updateFlashes(){
+    for(let i=flashes.length-1;i>=0;i--){
+      flashes[i].life -= 0.07;
+      if(flashes[i].life <= 0) flashes.splice(i,1);
+    }
+    for(let i=shockwaves.length-1;i>=0;i--){
+      shockwaves[i].life -= 0.045;
+      if(shockwaves[i].life <= 0) shockwaves.splice(i,1);
+    }
+  }
+  function drawFlashes(){
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for(const f of flashes){
+      const r = (45 + (1-f.life)*280) * f.scale;
+      const grad = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,r);
+      grad.addColorStop(0, hexToRGBA('#ffffff', f.life*0.5));
+      grad.addColorStop(0.35, hexToRGBA(f.color, f.life*0.4));
+      grad.addColorStop(1, hexToRGBA(f.color, 0));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(f.x,f.y,r,0,Math.PI*2);
+      ctx.fill();
+    }
+    for(const s of shockwaves){
+      const r = (20 + (1-s.life)*220) * s.scale;
+      ctx.globalAlpha = s.life*0.6;
+      ctx.strokeStyle = hexToRGBA(s.color, 1);
+      ctx.shadowColor = s.color;
+      ctx.shadowBlur = 16;
+      ctx.lineWidth = 2.2 * s.life;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI*2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function hexToRGBA(hex, a){
+    const c = hex.replace('#','');
+    const r = parseInt(c.substring(0,2),16);
+    const g = parseInt(c.substring(2,4),16);
+    const b = parseInt(c.substring(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // ---------------------------------------------------------------
+  // Star rendering — a large, elegant twinkling sparkle in the night sky
+  // ---------------------------------------------------------------
+  function starPath(r, points, innerRatio, rotation){
+    ctx.beginPath();
+    const total = points*2;
+    for(let i=0;i<total;i++){
+      const ang = (Math.PI/points)*i + rotation - Math.PI/2;
+      const rad = (i % 2 === 0) ? r : r*innerRatio;
+      const px = Math.cos(ang)*rad;
+      const py = Math.sin(ang)*rad;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+  }
+
+  function drawOrb(o, t){
+    if(!o.alive){
+      if(t > o.respawnAt){
+        o.alive = true;
+        o.scale = 0;
+      } else {
+        return;
+      }
+    }
+    if(o.scale < 1) o.scale = Math.min(1, o.scale + 0.035);
+
+    const floatY = Math.sin(t*0.001*o.floatSpeed + o.phase) * 10;
+    const twinkle = 0.92 + 0.08*Math.sin(t*0.0022 + o.phase*1.7);
+    const x = o.baseX;
+    const y = o.baseY + floatY;
+    const r = o.radius * o.scale * twinkle;
+    // interaction radius stays generous even between twinkle pulses
+    o.currentX = x; o.currentY = y; o.currentR = o.radius * o.scale;
+
+    ctx.save();
+    ctx.translate(x,y);
+    o.rotation += 0.0035;
+
+    // wide soft halo — makes the star read clearly against the night sky
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(0,0, r*0.15, 0,0, r*3.2);
+    halo.addColorStop(0, hexToRGBA(o.color.rim, 0.35));
+    halo.addColorStop(0.4, hexToRGBA(o.color.rim, 0.14));
+    halo.addColorStop(1, hexToRGBA(o.color.rim, 0));
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0,0, r*3.2, 0, Math.PI*2);
+    ctx.fill();
+
+    // large soft 8-point flare, slowly counter-rotating, for a layered starburst look
+    ctx.save();
+    ctx.rotate(-o.rotation*0.6);
+    ctx.globalAlpha = 0.35;
+    starPath(r*1.55, 8, 0.5, 0);
+    ctx.fillStyle = hexToRGBA(o.color.core, 1);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    // main 4-point sparkle — the crisp, iconic star shape
+    ctx.save();
+    ctx.rotate(o.rotation);
+    const grad = ctx.createRadialGradient(0,0,0, 0,0, r*1.15);
+    grad.addColorStop(0,   '#ffffff');
+    grad.addColorStop(0.35, hexToRGBA(o.color.core, 1));
+    grad.addColorStop(0.75, hexToRGBA(o.color.rim, 0.95));
+    grad.addColorStop(1,   hexToRGBA(o.color.rim, 0.3));
+    starPath(r*1.15, 4, 0.16, 0);
+    ctx.fillStyle = grad;
+    ctx.shadowColor = o.color.rim;
+    ctx.shadowBlur = r*0.5;
+    ctx.fill();
+    ctx.restore();
+
+    // small secondary sparkle, offset and rotated, for a jeweled multi-glint feel
+    ctx.save();
+    ctx.rotate(o.rotation*1.4 + 0.7);
+    ctx.globalAlpha = 0.8;
+    starPath(r*0.4, 4, 0.2, 0);
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = r*0.25;
+    ctx.fill();
+    ctx.restore();
+
+    // hot white core
+    ctx.beginPath();
+    ctx.arc(0,0, r*0.16, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = r*0.4;
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------
+  // Audio — Tone.js
+  // ---------------------------------------------------------------
+  let audioReady = false;
+  let chordSynth, chimeSynth, subBass, reverb, delay;
+
+  function initAudio(){
+    reverb = new Tone.Reverb({ decay: 4.5, wet: 0.5 }).toDestination();
+    delay = new Tone.FeedbackDelay({ delay: 0.25, feedback: 0.3, wet: 0.28 }).connect(reverb);
+
+    chordSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 1.8 }
+    }).connect(delay);
+    chordSynth.volume.value = -7;
+
+    chimeSynth = new Tone.Synth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.001, decay: 0.5, sustain: 0.05, release: 1.2 }
+    }).connect(delay);
+    chimeSynth.volume.value = -5;
+
+    subBass = new Tone.MembraneSynth({
+      pitchDecay: 0.05, octaves: 3,
+      envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 0.6 }
+    }).toDestination();
+    subBass.volume.value = -1;
+
+    audioReady = true;
+  }
+
+  const CHORDS = [
+    ['C5','E5','G5'], ['D5','F#5','A5'], ['E5','G5','B5'],
+    ['F5','A5','C6'], ['G5','B5','D6'], ['A5','C6','E6'],
+    ['B4','D5','F#5'], ['C5','G5','E6']
+  ];
+  const CHIMES = ['C6','D6','E6','G6','A6','C7'];
+
+  function playBurstSound(index){
+    if(!audioReady) return;
+    const now = Tone.now();
+    chordSynth.triggerAttackRelease(CHORDS[index % CHORDS.length], '4n', now);
+    chimeSynth.triggerAttackRelease(CHIMES[Math.floor(Math.random()*CHIMES.length)], '8n', now + 0.03);
+    subBass.triggerAttackRelease('C2', '8n', now);
+  }
+
+  // ---------------------------------------------------------------
+  // Interaction — explode
+  // ---------------------------------------------------------------
+  function explodeOrb(o, index){
+    if(!o.alive) return;
+    o.alive = false;
+    o.respawnAt = performance.now() + 3200 + Math.random()*1600;
+
+    const cx = o.currentX, cy = o.currentY;
+
+    // primary burst — the big shell
+    burstParticles(cx, cy, o.color, 1.15);
+    addFlash(cx, cy, o.color.rim, 1);
+    playBurstSound(index);
+
+    // secondary staggered mini-bursts around the primary, like trailing shells
+    const echoes = 1 + Math.floor(Math.random()*2);
+    for(let i=0;i<echoes;i++){
+      const delay = 140 + i*130 + Math.random()*80;
+      const ang = Math.random()*Math.PI*2;
+      const dist = o.currentR * (1.6 + Math.random()*1.4);
+      const ex = cx + Math.cos(ang)*dist;
+      const ey = cy + Math.sin(ang)*dist - 20;
+      setTimeout(()=>{
+        burstParticles(ex, ey, o.color, 0.38);
+        addFlash(ex, ey, o.color.core, 0.5);
+        if(audioReady){
+          const now = Tone.now();
+          chimeSynth.triggerAttackRelease(CHIMES[Math.floor(Math.random()*CHIMES.length)], '16n', now);
+        }
+      }, delay);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // MediaPipe Hands
+  // ---------------------------------------------------------------
+  let fingertips = []; // mirrored screen-space points
+
+  function onHandsResults(results){
+    fingertips = [];
+    if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
+      handDot.textContent = ' 인식됨';
+      for(const lm of results.multiHandLandmarks){
+        const tip = lm[8]; // LANDMARK_INDEX_FINGER_TIP
+        const mx = (1.0 - tip.x) * W; // mirror
+        const my = tip.y * H;
+        fingertips.push({x:mx, y:my});
+      }
+    } else {
+      handDot.textContent = ' 대기 중';
+    }
+  }
+
+  function checkInteractions(){
+    for(const pt of fingertips){
+      orbs.forEach((o, idx) => {
+        if(!o.alive) return;
+        const dx = pt.x - o.currentX;
+        const dy = pt.y - o.currentY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < o.currentR * 1.3){
+          explodeOrb(o, idx);
+        }
+      });
+    }
+  }
+
+  function drawFingertips(){
+    for(const pt of fingertips){
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(200,220,255,0.9)';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 9, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Night skyline background (inspired by reference photo) — 
+  // pre-rendered once per resize onto an offscreen canvas, then
+  // simply blitted each frame (cheap), with stars twinkling on top.
+  // ---------------------------------------------------------------
+  let skylineCanvas, skylineCtx;
+  let stars = [];
+  let riverTopY = 0;
+
+  function buildSkyline(){
+    if(!skylineCanvas){
+      skylineCanvas = document.createElement('canvas');
+      skylineCtx = skylineCanvas.getContext('2d');
+    }
+    skylineCanvas.width = Math.max(1, W*DPR);
+    skylineCanvas.height = Math.max(1, H*DPR);
+    skylineCtx.setTransform(DPR,0,0,DPR,0,0);
+    const sctx = skylineCtx;
+
+    const skylineTop = H * (1 - SKYLINE_FRAC);
+    const riverTop = H * 0.87;
+    riverTopY = riverTop;
+
+    // --- sky gradient: deep indigo night fading to a dusky rose horizon ---
+    const sky = sctx.createLinearGradient(0,0,0,riverTop);
+    sky.addColorStop(0,    '#050615');
+    sky.addColorStop(0.32, '#0a0f2e');
+    sky.addColorStop(0.6,  '#231a3f');
+    sky.addColorStop(0.82, '#3d2b48');
+    sky.addColorStop(1,    '#57394f');
+    sctx.fillStyle = sky;
+    sctx.fillRect(0,0,W,riverTop);
+
+    // ambient warm glow of city light pollution near the horizon
+    const glow = sctx.createRadialGradient(W*0.52, skylineTop, 10, W*0.52, skylineTop, W*0.65);
+    glow.addColorStop(0, 'rgba(255,185,140,0.16)');
+    glow.addColorStop(1, 'rgba(255,185,140,0)');
+    sctx.fillStyle = glow;
+    sctx.fillRect(0,0,W,riverTop);
+
+    // soft moon, upper corner
+    const moonX = W*0.86, moonY = H*0.14, moonR = Math.min(W,H)*0.035;
+    const moonGlow = sctx.createRadialGradient(moonX,moonY,0,moonX,moonY,moonR*5);
+    moonGlow.addColorStop(0,'rgba(255,250,235,0.35)');
+    moonGlow.addColorStop(1,'rgba(255,250,235,0)');
+    sctx.fillStyle = moonGlow;
+    sctx.fillRect(0,0,W,riverTop);
+    sctx.fillStyle = 'rgba(255,250,235,0.9)';
+    sctx.beginPath(); sctx.arc(moonX,moonY,moonR,0,Math.PI*2); sctx.fill();
+
+    // --- distant hazy mountain ridge ---
+    sctx.fillStyle = 'rgba(45,38,64,0.5)';
+    sctx.beginPath();
+    sctx.moveTo(0, skylineTop);
+    const ridgeSeg = 9;
+    for(let i=0;i<=ridgeSeg;i++){
+      const rx = (W/ridgeSeg)*i;
+      const ry = skylineTop - 14 - Math.abs(Math.sin(i*1.7+0.4))*26 - Math.random()*8;
+      sctx.lineTo(rx, ry);
+    }
+    sctx.lineTo(W, riverTop);
+    sctx.lineTo(0, riverTop);
+    sctx.closePath();
+    sctx.fill();
+
+    // --- river band ---
+    const river = sctx.createLinearGradient(0, riverTop, 0, H);
+    river.addColorStop(0, '#0b1326');
+    river.addColorStop(1, '#02030a');
+    sctx.fillStyle = river;
+    sctx.fillRect(0, riverTop, W, H-riverTop);
+
+    // --- building silhouettes ---
+    const buildings = [];
+    let bx = -30;
+    while(bx < W+30){
+      const bw = 26 + Math.random()*64;
+      const bh = 50 + Math.random() * (H*SKYLINE_FRAC*0.75);
+      buildings.push({x:bx, w:bw, h:bh, twin:false});
+      bx += bw + (2 + Math.random()*7);
+    }
+    // two slender twin towers, left-of-center — the photo's signature silhouette
+    const twinW = W*0.035;
+    const twinH = H*SKYLINE_FRAC*1.55;
+    buildings.push({x: W*0.135, w:twinW, h:twinH, twin:true});
+    buildings.push({x: W*0.135+twinW+W*0.012, w:twinW*0.9, h:twinH*0.86, twin:true});
+    buildings.sort((a,b)=>a.x-b.x);
+
+    function drawBuildingShape(g, b, alpha, flip){
+      const top = riverTop - b.h;
+      g.globalAlpha = alpha;
+      const shade = 0.06 + Math.random()*0.05;
+      g.fillStyle = b.twin ? `rgba(14,17,30,${0.96})` : `rgba(${16+shade*40},${19+shade*40},${34+shade*50},0.94)`;
+      g.fillRect(b.x, top, b.w, b.h);
+
+      // windows
+      const cols = Math.max(2, Math.floor(b.w/7));
+      const rows = Math.max(3, Math.floor(b.h/11));
+      const cw = b.w/cols, rh = b.h/rows;
+      for(let cRow=0; cRow<rows; cRow++){
+        for(let cCol=0; cCol<cols; cCol++){
+          if(Math.random() < 0.32){
+            const wx = b.x + cCol*cw + cw*0.25;
+            const wy = top + cRow*rh + rh*0.25;
+            const warm = Math.random() < 0.82;
+            g.fillStyle = warm ? 'rgba(255,214,140,0.85)' : 'rgba(180,215,255,0.75)';
+            g.fillRect(wx, wy, cw*0.5, rh*0.5);
+          }
+        }
+      }
+      // aviation light on tallest towers
+      if(b.twin){
+        g.fillStyle = 'rgba(255,90,90,0.9)';
+        g.beginPath(); g.arc(b.x + b.w/2, top-2, 2, 0, Math.PI*2); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+
+    buildings.forEach(b => drawBuildingShape(sctx, b, 1, false));
+
+    // --- river reflections: flipped, faded echo of the skyline ---
+    sctx.save();
+    sctx.translate(0, riverTop*2);
+    sctx.scale(1,-1);
+    buildings.forEach(b => drawBuildingShape(sctx, b, 0.22, true));
+    sctx.restore();
+    // fade the reflection toward the bottom of the river
+    const riverFade = sctx.createLinearGradient(0, riverTop, 0, H);
+    riverFade.addColorStop(0, 'rgba(2,3,10,0)');
+    riverFade.addColorStop(1, 'rgba(2,3,10,0.9)');
+    sctx.fillStyle = riverFade;
+    sctx.fillRect(0, riverTop, W, H-riverTop);
+
+    // --- bridge crossing the river ---
+    const bridgeY = riverTop + (H-riverTop)*0.32;
+    sctx.strokeStyle = 'rgba(10,12,22,0.9)';
+    sctx.lineWidth = Math.max(2, H*0.006);
+    sctx.beginPath();
+    sctx.moveTo(0, bridgeY);
+    sctx.lineTo(W, bridgeY + 4);
+    sctx.stroke();
+    const pylons = Math.floor(W/70);
+    for(let i=0;i<=pylons;i++){
+      const px = (W/pylons)*i;
+      sctx.fillStyle = 'rgba(255,225,170,0.8)';
+      sctx.beginPath();
+      sctx.arc(px, bridgeY + (px/W)*4, 1.6, 0, Math.PI*2);
+      sctx.fill();
+    }
+
+    // rebuild stars for the fresh sky area
+    stars = [];
+    const starCount = Math.floor((W*skylineTop)/9000);
+    for(let i=0;i<starCount;i++){
+      stars.push({
+        x: Math.random()*W,
+        y: Math.random()*skylineTop*0.92,
+        r: 0.4 + Math.random()*1.1,
+        phase: Math.random()*Math.PI*2,
+        speed: 0.5 + Math.random()*1.2
+      });
+    }
+  }
+
+  function drawStars(t){
+    for(const s of stars){
+      const tw = 0.4 + 0.6*Math.max(0, Math.sin(t*0.0007*s.speed + s.phase));
+      ctx.globalAlpha = tw;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------
+  // Main render loop
+  // ---------------------------------------------------------------
+  function drawBackground(t){
+    if(skylineCanvas){
+      ctx.drawImage(skylineCanvas, 0, 0, W, H);
+      drawStars(t);
+    } else {
+      ctx.fillStyle = '#04060f';
+      ctx.fillRect(0,0,W,H);
+    }
+  }
+
+  function loop(t){
+    drawBackground(t);
+    orbs.forEach(o => drawOrb(o, t));
+    checkInteractions();
+    updateParticles(t);
+    drawParticles(t);
+    updateFlashes();
+    drawFlashes();
+    drawFingertips();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------------------------------------------------------------
+  // Boot sequence
+  // ---------------------------------------------------------------
+  async function start(){
+    startBtn.disabled = true;
+    startBtn.textContent = '카메라 연결 중…';
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width:1280, height:720 }, audio:false });
+      video.srcObject = stream;
+      await video.play();
+
+      resize();
+      initAudio();
+      await Tone.start();
+
+      const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}` });
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.6
+      });
+      hands.onResults(onHandsResults);
+
+      let lastHandFrame = 0;
+      const HAND_INTERVAL = 1000/24; // cap hand inference independent of render fps
+      async function feedFrame(now){
+        if(now - lastHandFrame >= HAND_INTERVAL){
+          lastHandFrame = now;
+          await hands.send({ image: video });
+        }
+        requestAnimationFrame(feedFrame);
+      }
+      requestAnimationFrame(feedFrame);
+
+      startScreen.classList.add('fade-out');
+      setTimeout(()=> startScreen.style.display='none', 1300);
+
+      requestAnimationFrame(loop);
+    } catch(err){
+      console.error(err);
+      startBtn.disabled = false;
+      startBtn.textContent = '다시 시도하기';
+      alert('카메라 권한이 필요합니다. 브라우저 설정을 확인해 주세요.');
+    }
+  }
+
+  startBtn.addEventListener('click', start);
+  layoutOrbs();
+})();
+</script>
+</body>
+</html>
